@@ -1,0 +1,23 @@
+# Conda environment for host-side ("physna-reality-compiler") Python: repo tooling and
+# exercising the pure-Python `physna.reality_compiler.api` package outside
+# Kit.
+#
+# This env intentionally does NOT include `omni`, `pxr`, `carb`, or
+# `warp` — those live only in the Kit-bundled Python and cannot load from
+# a plain conda env. Code touching them must run inside Kit.
+name: physna-reality-compiler
+channels:
+  - conda-forge
+  - defaults
+dependencies:
+  - python=3.12
+  - pip
+  - pip:
+      - numpy
+      - requests
+      - keyring
+      - laspy
+      - lazrs
+      - pye57
+      - trimesh
+      - pypcd4

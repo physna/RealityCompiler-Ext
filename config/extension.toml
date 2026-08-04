@@ -1,0 +1,67 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 Physna, Inc.
+# SPDX-License-Identifier: Apache-2.0
+
+[package]
+title = "Physna Reality Compiler"
+version = "0.6.0"  # Semantic Versioning is used: https://semver.org/
+description = "Omniverse client for the hosted Physna Reality Compiler API: select a scene and parts, upload, and place matched parts back into the stage."
+category = "Tools"  # How to categorize this in the Extension Manager
+changelog = "docs/CHANGELOG.md"
+icon = "data/physna_logo.jpg"  # Icon to show in the Extension Manager
+keywords = ["physna", "omniverse", "point cloud", "scan", "scan search", "matching", "hosted api", "reality compiler"]  # Search keywords for the Extension Manager
+preview_image = "data/preview.png"  # Preview to show in the Extension Manager
+readme  = "README.md"  # Path (relative to the root) or content of readme markdown file for UI
+repository = "https://github.com/physna/RealityCompiler-Ext"
+
+
+[dependencies]
+# Matching now runs on the hosted Physna platform, so the extension only
+# needs enough Kit surface to select/convert assets, pick files, render
+# point clouds, and post toasts.  The GPU (omni.warp.core) and Flow
+# dependencies the old in-process matcher required are gone.
+"omni.kit.asset_converter" = {}
+"omni.kit.notification_manager" = {}
+"omni.kit.pipapi" = {}
+"omni.kit.window.filepicker" = {}
+"omni.kit.pointclouds" = {}
+"omni.pointcloud.ui" = {}
+"omni.usd.fileformat.e57" = {}
+# Real Kit UI widgets reused by the accordion UI: the dedicated search
+# bar (magnifier + tokens) and the searchable dropdown. Both degrade
+# gracefully if unavailable — the UI falls back to a plain StringField.
+"omni.kit.widget.searchfield" = {}
+"omni.kit.widget.searchable_combobox" = {}
+
+# Pip dependencies for the thin client. Declared here so Kit resolves them
+# when the extension is enabled; extension.py also installs them as a runtime
+# backstop — requests/keyring synchronously (needed at startup), the format
+# libraries on a background thread so the window opens immediately (a file
+# load that races the install waits via deps.ensure_deferred_ready). Keep this
+# list in sync with extension.py. numpy is intentionally omitted: it ships
+# with Kit, and pip-installing it can shadow Kit's build and break the
+# omni/pxr ABI.
+[[python.pipapi.install]]
+packages = ["requests", "keyring", "laspy", "lazrs", "pye57", "trimesh", "pypcd4"]
+
+
+[settings]
+
+
+[[python.module]]  # Main python module this extension provides, it will be publicly available as "import physna.reality_compiler"
+name = "physna.reality_compiler"
+
+
+[documentation]
+pages = [
+    "docs/Overview.md",
+    "docs/DISCLAIMER.md",
+    "docs/CHANGELOG.md",
+]
+
+
+[[test]]
+dependencies = [
+]
+
+args = [
+]

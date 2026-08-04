@@ -1,0 +1,13 @@
+version: 2
+updates:
+  # Python deps (the thin-client pip packages and dev tooling).
+  - package-ecosystem: 'pip'
+    directory: '/'
+    schedule:
+      interval: 'daily'
+
+  # The release workflow's pinned GitHub Actions.
+  - package-ecosystem: 'github-actions'
+    directory: '/'
+    schedule:
+      interval: 'daily'
