@@ -9,6 +9,13 @@ each matched part back into the stage at the transform the engine found.
 Matching runs entirely on the Physna platform, so the extension has no
 GPU or Open3D dependency and installs anywhere Kit runs.
 
+## Demo
+
+https://github.com/user-attachments/assets/6e56c8e2-3211-460f-87df-c46eb915e40c
+
+*(Full-quality version: attached to the
+[v0.6.0 release](https://github.com/physna/RealityCompiler-Ext/releases/tag/v0.6.0).)*
+
 ## License, Support & Disclaimer
 
 This is an **open-source project** under the
