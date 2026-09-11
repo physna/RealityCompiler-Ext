@@ -8,6 +8,21 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 > almost no surface. The pre-0.4.0 local-matching history is preserved in
 > git (tags `v0.1.0`–`v0.3.0`) but is not carried forward here.
 
+## [0.6.1] - 2026-09-11
+
+Scan-search reliability patch.
+
+### Fixed
+- API calls now retry transient connection, timeout, and TLS EOF failures;
+  upload retries rewind file streams so large scan uploads can recover from
+  interrupted HTTPS connections.
+- Searches that outlive the local wait window are saved as resumable pending
+  runs instead of being reported as hard failures.
+- Runs whose scene is still indexing no longer display finished parts as
+  zero-match results; the UI now shows that matches are waiting on the scene.
+- Previous Searches now labels incomplete records as partial results and
+  keeps Resume/Update messaging aligned with platform-side indexing work.
+
 ## [0.6.0] - 2026-08-04
 
 Open-source release. This version prepares the repository for its public

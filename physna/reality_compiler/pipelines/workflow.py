@@ -124,15 +124,17 @@ MATCH_WAIT_TIMEOUT_S = 10 * 60.0  # 10 minutes
 
 
 def _is_matches_pending(exc: Exception) -> bool:
-    """True for the 404 the API returns while a scene-match is still computing.
+    """True for API responses returned while scene matches are not ready yet.
 
-    That's a transient "not ready yet" (the matcher runs a beat after both
-    assets finish), not a real failure — the caller should retry, not surface
-    it as an error."""
+    These are transient "not ready yet" states, not real no-match results, so
+    callers should retry instead of surfacing them as errors.
+    """
+    if not isinstance(exc, ApiError):
+        return False
+    body = (getattr(exc, "body", "") or "").lower()
     return (
-        isinstance(exc, ApiError)
-        and exc.status_code == 404
-        and "not been computed" in (getattr(exc, "body", "") or "").lower()
+        (exc.status_code == 404 and "not been computed" in body)
+        or (exc.status_code == 409 and "not indexed yet" in body)
     )
 
 
@@ -162,6 +164,10 @@ def sanitize_folder_name(name: str) -> str:
 
 class WorkflowError(RuntimeError):
     """A hard stop that should abort the whole run (e.g. scene not finished)."""
+
+
+class WorkflowPending(WorkflowError):
+    """The platform is still processing a resumable run."""
 
 
 class ScanSearchWorkflow:
@@ -790,10 +796,11 @@ class ScanSearchWorkflow:
                 await on_round()  # read matches for parts that just finished
             if time.monotonic() - started > timeout_s:
                 self._apply_resolved(state, poll)
-                raise WorkflowError(
+                raise WorkflowPending(
                     f"Timed out after {int(timeout_s)}s"
                     + (f" indexing {subject}" if subject else "")
-                    + f" with {len(poll.pending)}/{len(ids)} asset(s) still indexing."
+                    + f" with {len(poll.pending)}/{len(ids)} asset(s) still indexing. "
+                    "The search was saved and can be resumed later."
                 )
             base = (
                 f"Indexing{' ' + subject if subject else '...'} "

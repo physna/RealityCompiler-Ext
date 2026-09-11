@@ -57,10 +57,11 @@ from ..util import (
 from physna.reality_compiler.api import (
     AuthError,
     QUERYABLE_STATES,
+    SCENE_REQUIRED_STATE,
     TERMINAL_STATES,
 )
 from physna.reality_compiler.logger import get_logger, notify_user
-from physna.reality_compiler.pipelines import PipelineManager, WorkflowError
+from physna.reality_compiler.pipelines import PipelineManager, WorkflowError, WorkflowPending
 
 _log = get_logger("physna.reality_compiler.ui")
 
@@ -1040,7 +1041,11 @@ class ScanSearchUI:
             return
         if not part.matches:
             # Still indexing, or terminal with no matches - status only.
-            if state_str in _GOOD_STATES:
+            scene = self.manager.state.scene_asset
+            if scene is not None and scene.state != SCENE_REQUIRED_STATE:
+                color = _COLOR_WARNING
+                note = f"[scene {scene.state}] waiting for scene to finish"
+            elif state_str in _GOOD_STATES:
                 color, note = _COLOR_MUTED, "[finished] no matches"
             else:
                 color, note = _COLOR_WARNING, f"[{state_str}]"
@@ -1292,7 +1297,8 @@ class ScanSearchUI:
         ui.Line(height=6, style={"color": _DIVIDER})
         ui.Label(record.name, style={"font_size": _FONT_MD}, word_wrap=True)
         ui.Label(
-            f"{len(record.parts)} part(s), {record.total_matches} match(es)   "
+            f"{len(record.parts)} part(s), {record.total_matches} match(es)"
+            f"{' so far' if not record.complete else ''}   "
             f"{record.created_at}",
             style=_STYLE_MUTED_SM, word_wrap=True,
         )
@@ -1309,7 +1315,8 @@ class ScanSearchUI:
             )
         elif interrupted:
             ui.Label(
-                "Interrupted while indexing - Resume to finish reading matches.",
+                "Still indexing or matching on the platform - Resume to keep "
+                "checking for results.",
                 style={"color": _COLOR_WARNING, "font_size": _FONT_SM},
                 word_wrap=True,
             )
@@ -2052,6 +2059,8 @@ class ScanSearchUI:
             except asyncio.CancelledError:
                 notify_user("Search cancelled", "warning")
                 raise
+            except WorkflowPending as exc:
+                notify_user(str(exc), "warning")
             except (AuthError, WorkflowError) as exc:
                 notify_user(str(exc), "error")
             except Exception as exc:
@@ -2238,6 +2247,8 @@ class ScanSearchUI:
                     f"{record.total_matches} match(es).{note}",
                     "info",
                 )
+            except WorkflowPending as exc:
+                notify_user(str(exc), "warning")
             except (AuthError, WorkflowError) as exc:
                 notify_user(str(exc), "error")
             except Exception as exc:
@@ -2273,10 +2284,19 @@ class ScanSearchUI:
                 self._run_name_model.set_value(updated.name)
                 self._reset_part_models()
                 done = "Resumed" if resume else "Updated"
-                notify_user(
-                    f"{done} '{updated.name}': {updated.total_matches} match(es)",
-                    "info",
-                )
+                if updated.complete:
+                    notify_user(
+                        f"{done} '{updated.name}': {updated.total_matches} match(es)",
+                        "info",
+                    )
+                else:
+                    notify_user(
+                        f"{done} '{updated.name}': still indexing or matching "
+                        f"({updated.total_matches} match(es) so far)",
+                        "warning",
+                    )
+            except WorkflowPending as exc:
+                notify_user(str(exc), "warning")
             except (AuthError, WorkflowError) as exc:
                 notify_user(str(exc), "error")
             except Exception as exc:

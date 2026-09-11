@@ -4,7 +4,7 @@
 
 from .manager import PART_EXTENSIONS, SCENE_EXTENSIONS, PipelineManager
 from .state import PartEntry, PipelineState, SceneSource
-from .workflow import ScanSearchWorkflow, WorkflowError
+from .workflow import ScanSearchWorkflow, WorkflowError, WorkflowPending
 
 __all__ = [
     "PipelineManager",
@@ -13,6 +13,7 @@ __all__ = [
     "SceneSource",
     "ScanSearchWorkflow",
     "WorkflowError",
+    "WorkflowPending",
     "SCENE_EXTENSIONS",
     "PART_EXTENSIONS",
 ]
