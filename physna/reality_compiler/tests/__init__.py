@@ -4,6 +4,7 @@
 # the cases. All modules except test_hello are pure Python and also run in a
 # plain interpreter: python -m unittest discover -s physna/reality_compiler/tests
 from .test_api_models import *
+from .test_api_client import *
 from .test_hello import *
 from .test_last_dir_store import *
 from .test_paths_and_deps import *

@@ -18,7 +18,8 @@ from __future__ import annotations
 
 import json
 import os
-from typing import Any, Callable, Mapping
+import time
+from typing import Any, Callable, Iterable, Mapping
 
 import requests
 
@@ -45,6 +46,12 @@ class ApiError(RuntimeError):
 class PhysnaClient:
     """Authenticated client bound to one tenant."""
 
+    _RETRYABLE_NETWORK_ERRORS = (
+        requests.exceptions.ConnectionError,
+        requests.exceptions.Timeout,
+        requests.exceptions.SSLError,
+    )
+
     def __init__(
         self,
         config: ApiConfig,
@@ -52,11 +59,15 @@ class PhysnaClient:
         *,
         session: requests.Session | None = None,
         timeout: float = 120.0,
+        network_retries: int = 2,
+        retry_backoff_s: float = 0.75,
     ) -> None:
         self._config = config
         self._auth = token_provider
         self._session = session or requests.Session()
         self._timeout = timeout
+        self._network_retries = max(0, network_retries)
+        self._retry_backoff_s = max(0.0, retry_backoff_s)
 
     @property
     def config(self) -> ApiConfig:
@@ -204,22 +215,40 @@ class PhysnaClient:
         _retry_on_auth: bool = True,
     ) -> requests.Response:
         headers = {"Authorization": f"Bearer {self._auth.token()}"}
-        try:
-            resp = self._session.request(
-                method,
-                url,
-                data=data,
-                files=files,
-                headers=headers,
-                timeout=self._timeout,
-                stream=stream,
-            )
-        except requests.RequestException as exc:
-            raise ApiError(0, f"network error: {exc}") from exc
+        attempts = self._network_retries + 1
+        for attempt in range(attempts):
+            if attempt:
+                if not _rewind_request_files(files):
+                    raise ApiError(
+                        0,
+                        "network error: upload failed and request file stream "
+                        "could not be rewound for retry",
+                    )
+                if self._retry_backoff_s:
+                    time.sleep(self._retry_backoff_s * (2 ** (attempt - 1)))
+            try:
+                resp = self._session.request(
+                    method,
+                    url,
+                    data=data,
+                    files=files,
+                    headers=headers,
+                    timeout=self._timeout,
+                    stream=stream,
+                )
+                break
+            except self._RETRYABLE_NETWORK_ERRORS as exc:
+                if attempt >= attempts - 1:
+                    raise ApiError(
+                        0,
+                        f"network error after {attempts} attempts: {exc}",
+                    ) from exc
+            except requests.RequestException as exc:
+                raise ApiError(0, f"network error: {exc}") from exc
 
-        # A stale token yields 401; refresh once and retry.  File uploads
-        # can't be retried transparently (the stream is consumed), so we
-        # only retry idempotent calls without a file body.
+        # A stale token yields 401; refresh once and retry. Auth retries are
+        # still limited to calls without a file body, because a 401 response
+        # means the server already received and rejected the request.
         if resp.status_code == 401 and _retry_on_auth and files is None:
             self._auth.invalidate()
             return self._request(
@@ -235,3 +264,24 @@ class PhysnaClient:
         if resp.status_code not in expected:
             raise ApiError(resp.status_code, resp.reason or "request failed", resp.text)
         return resp
+
+
+def _iter_request_file_objects(files: Any) -> Iterable[Any]:
+    if files is None:
+        return
+    entries = files.values() if isinstance(files, Mapping) else files
+    for entry in entries:
+        candidate = entry
+        if isinstance(entry, (tuple, list)) and len(entry) >= 2:
+            candidate = entry[1]
+        if hasattr(candidate, "seek"):
+            yield candidate
+
+
+def _rewind_request_files(files: Any) -> bool:
+    try:
+        for file_obj in _iter_request_file_objects(files):
+            file_obj.seek(0)
+    except (AttributeError, OSError, ValueError):
+        return False
+    return True
